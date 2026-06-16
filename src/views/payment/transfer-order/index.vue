@@ -119,6 +119,7 @@
         { prop: 'account_name', label: '收款人', width: 100 },
         { prop: 'bank_name', label: '开户银行', minWidth: 120 },
         { prop: 'account_no', label: '银行卡号', minWidth: 200 },
+        { prop: 'account_phone', label: '收款人手机号', width: 130 },
         { prop: 'status', label: '状态', width: 100, useSlot: true, slotName: 'status' },
         { prop: 'transfer_no', label: '上游代付单号', minWidth: 160 },
         { prop: 'create_time', label: '进单时间', width: 170, sortable: true },

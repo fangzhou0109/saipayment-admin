@@ -58,6 +58,9 @@
         <el-descriptions-item label="开户支行">{{
           detail.branch_name || '-'
         }}</el-descriptions-item>
+        <el-descriptions-item label="收款人手机号">{{
+          detail.account_phone || '-'
+        }}</el-descriptions-item>
       </el-descriptions>
     </el-card>
 
