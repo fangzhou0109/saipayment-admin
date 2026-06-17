@@ -7,13 +7,7 @@
     :close-on-click-modal="false"
     @close="handleClose"
   >
-    <el-alert
-      v-if="dialogType === 'add'"
-      type="info"
-      :closable="false"
-      show-icon
-      class="tip-alert"
-    >
+    <el-alert v-if="dialogType === 'add'" type="info" :closable="false" show-icon class="tip-alert">
       费率与单笔限额请在创建成功后，于列表操作列「更多」中单独配置。
     </el-alert>
 
@@ -73,6 +67,21 @@
             <sa-radio v-model="formData.status" dict="data_status" />
           </el-form-item>
         </el-col>
+        <el-col :span="12">
+          <el-form-item label="代付自审" prop="transfer_self_audit">
+            <el-switch
+              v-model="formData.transfer_self_audit"
+              :active-value="1"
+              :inactive-value="0"
+              inline-prompt
+              active-text="开启"
+              inactive-text="关闭"
+            />
+            <div class="field-tip"
+              >开启后商户可在门户「代付订单」自助审核下发/拒绝，平台不再审核其代付单</div
+            >
+          </el-form-item>
+        </el-col>
         <el-col :span="24">
           <el-form-item label="IP 白名单" prop="ip_whitelist">
             <el-input
@@ -110,9 +119,7 @@
   import api from '@/api/payment/merchant'
   import { ElMessage } from 'element-plus'
   import type { FormInstance, FormRules } from 'element-plus'
-  import CredentialsPanel, {
-    type MerchantCredentials
-  } from './credentials-panel.vue'
+  import CredentialsPanel, { type MerchantCredentials } from './credentials-panel.vue'
 
   interface Props {
     modelValue: boolean
@@ -195,6 +202,7 @@
     password: '',
     ip_whitelist: '',
     ip_whitelist_status: 2,
+    transfer_self_audit: 0,
     status: 1,
     remark: ''
   }
@@ -237,7 +245,9 @@
         ;(formData as any)[key] = record[key]
       }
     }
-    formData.ip_whitelist_status = Number(record.ip_whitelist_status ?? formData.ip_whitelist_status ?? 2)
+    formData.ip_whitelist_status = Number(
+      record.ip_whitelist_status ?? formData.ip_whitelist_status ?? 2
+    )
   }
 
   const handleClose = () => {
