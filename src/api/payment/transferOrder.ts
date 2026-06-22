@@ -50,5 +50,25 @@ export default {
       url: '/core/pay/transferOrder/audit',
       data: params
     })
+  },
+
+  /** 手动重推下游通知（仅终态可推） */
+  renotify(id: number | string) {
+    return request.post<any>({
+      url: '/core/pay/transferOrder/renotify',
+      data: { id }
+    })
+  },
+
+  /**
+   * 人工确认代付成功并立即通知下游
+   * @param id 代付单ID
+   * @param remark 运营备注（可选）
+   */
+  manualSuccess(id: number | string, remark = '') {
+    return request.post<any>({
+      url: '/core/pay/transferOrder/manualSuccess',
+      data: { id, remark }
+    })
   }
 }

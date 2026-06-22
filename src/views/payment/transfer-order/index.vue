@@ -47,6 +47,28 @@
             >
               详情
             </ElButton>
+            <ElButton
+              v-permission="'pay:transferOrder:audit'"
+              type="warning"
+              size="small"
+              plain
+              :disabled="!canRenotify(row)"
+              :loading="renotifyingId === row.id"
+              @click="handleRenotify(row)"
+            >
+              重推通知
+            </ElButton>
+            <ElButton
+              v-permission="'pay:transferOrder:audit'"
+              type="danger"
+              size="small"
+              plain
+              :disabled="!canManualSuccess(row)"
+              :loading="manualSuccessingId === row.id"
+              @click="handleManualSuccess(row)"
+            >
+              确认成功
+            </ElButton>
           </div>
         </template>
       </ArtTable>
@@ -63,6 +85,7 @@
 </template>
 
 <script setup lang="ts">
+  import { ElMessage, ElMessageBox } from 'element-plus'
   import { useTable } from '@/hooks/core/useTable'
   import api from '@/api/payment/transferOrder'
   import { WITHDRAW_STATUS_MAP } from '../constants'
@@ -72,6 +95,18 @@
   defineOptions({ name: 'PayTransferOrder' })
 
   const statusMap = WITHDRAW_STATUS_MAP
+  const renotifyingId = ref<number | string>('')
+  const manualSuccessingId = ref<number | string>('')
+
+  /** 仅终态（成功=3 / 代付失败=-2）允许重推下游通知 */
+  const canRenotify = (row: Record<string, any>) => row.status === 3 || row.status === -2
+
+  /**
+   * 允许人工确认成功的状态：审核通过待下发(1)/代付中(2)/代付失败已退款(-2)。
+   * 待审核(0)未发起代付、已拒绝(-1)、已成功(3) 不展示该操作。
+   */
+  const canManualSuccess = (row: Record<string, any>) =>
+    row.status === 1 || row.status === 2 || row.status === -2
 
   // 审核抽屉状态
   const auditVisible = ref(false)
@@ -123,7 +158,7 @@
         { prop: 'status', label: '状态', width: 100, useSlot: true, slotName: 'status' },
         { prop: 'transfer_no', label: '上游代付单号', minWidth: 160 },
         { prop: 'create_time', label: '进单时间', width: 170, sortable: true },
-        { prop: 'operation', label: '操作', width: 150, fixed: 'right', useSlot: true }
+        { prop: 'operation', label: '操作', width: 320, fixed: 'right', useSlot: true }
       ]
     }
   })
@@ -146,5 +181,70 @@
     currentRow.value = row
     auditReadonly.value = true
     auditVisible.value = true
+  }
+
+  /** 手动重推下游通知（仅终态可推，二次确认后调用） */
+  const handleRenotify = async (row: Record<string, any>) => {
+    if (!canRenotify(row)) {
+      ElMessage.warning('代付处理中，暂无可推送的结果通知')
+      return
+    }
+    try {
+      await ElMessageBox.confirm(
+        `确认重新向下游推送该代付单（${row.withdraw_no}）的结果通知？`,
+        '重推通知',
+        { type: 'warning', confirmButtonText: '确认重推', cancelButtonText: '取消' }
+      )
+    } catch {
+      return
+    }
+
+    renotifyingId.value = row.id
+    try {
+      const res: any = await api.renotify(row.id)
+      ElMessage.success(res?.message || '通知已重新投递')
+      refreshData()
+    } finally {
+      renotifyingId.value = ''
+    }
+  }
+
+  /**
+   * 人工确认代付成功并立即通知下游（高风险：会按状态扣减/补扣商户余额）。
+   * 适用「下游实际已出款成功，但上游返回错误/超时」的差错处理，需二次确认 + 填写备注。
+   */
+  const handleManualSuccess = async (row: Record<string, any>) => {
+    if (!canManualSuccess(row)) {
+      ElMessage.warning('当前状态不可人工确认成功')
+      return
+    }
+
+    let remark = ''
+    try {
+      const { value } = await ElMessageBox.prompt(
+        `确认把代付单（${row.withdraw_no}）置为「成功」并立即通知下游？\n` +
+          `若该单为「代付失败」状态，将从商户可用余额补扣 ${row.amount} 元（实际已出款）。此操作不可撤销。`,
+        '人工确认代付成功',
+        {
+          type: 'warning',
+          confirmButtonText: '确认置成功',
+          cancelButtonText: '取消',
+          inputPlaceholder: '请填写差错处理备注（选填）',
+          inputType: 'textarea'
+        }
+      )
+      remark = value || ''
+    } catch {
+      return
+    }
+
+    manualSuccessingId.value = row.id
+    try {
+      const res: any = await api.manualSuccess(row.id, remark)
+      ElMessage.success(res?.message || '已确认代付成功')
+      refreshData()
+    } finally {
+      manualSuccessingId.value = ''
+    }
   }
 </script>
